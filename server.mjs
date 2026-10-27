@@ -32,14 +32,15 @@ http.createServer(async (req,res)=>{
       res.writeHead(200,{'Content-Type':'application/json; charset=utf-8'}).end(JSON.stringify(status)); return;
     }
     if(url.pathname==='/api/search') {
-      const q=(url.searchParams.get('q')||'').trim().toLowerCase();
+      const q=(url.searchParams.get('q')||'').trim().normalize('NFC').toLowerCase();
       if(!q || q.length>200){res.writeHead(400,{'Content-Type':'application/json'}).end(JSON.stringify({error:'Enter a search term of up to 200 characters.'}));return;}
       const files=await readdir(records).catch(e=>{if(e.code==='ENOENT')return [];throw e});
       const results=[];
       for(const file of files.filter(f=>f.endsWith('.json'))) {
-        try { const r=JSON.parse(await readFile(path.join(records,file),'utf8')); if(typeof r.text!=='string'||!r.text.toLowerCase().includes(q)) continue;
-          const i=r.text.toLowerCase().indexOf(q); const pdf=typeof r.pdfFile==='string' && /^[0-9a-f-]+\.pdf$/i.test(r.pdfFile)?r.pdfFile:null;
-          results.push({type:r.type==='message'?'Message':'PDF',filename:r.filename||'Unnamed PDF',chatId:r.chatId||'Unknown',timestamp:Number(r.timestamp)||null,excerpt:r.text.slice(Math.max(0,i-60),i+q.length+100).replace(/\s+/g,' '),pdf});
+        try { const r=JSON.parse(await readFile(path.join(records,file),'utf8')); if(typeof r.text!=='string') continue;
+          const displayText=r.text.normalize('NFC');
+          const i=displayText.toLowerCase().indexOf(q); if(i<0) continue; const pdf=typeof r.pdfFile==='string' && /^[0-9a-f-]+\.pdf$/i.test(r.pdfFile)?r.pdfFile:null;
+          results.push({type:r.type==='message'?'Message':'PDF',filename:r.filename||'Unnamed PDF',chatId:r.chatId||'Unknown',timestamp:Number(r.timestamp)||null,excerpt:displayText.slice(Math.max(0,i-60),i+q.length+100).replace(/\s+/g,' '),pdf});
         } catch { /* Skip incomplete or invalid index files. */ }
       }
       results.sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
