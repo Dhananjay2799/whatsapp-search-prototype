@@ -8,6 +8,11 @@ import { PDFParse } from 'pdf-parse';
 import { mkdir, writeFile, access } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
+const indexMessages = process.env.INDEX_MESSAGES === '1';
+console.log(indexMessages
+  ? 'Text message indexing is ON. New message text will be saved in the documents folder.'
+  : 'Text message indexing is OFF. Set INDEX_MESSAGES=1 before starting to enable it. PDF indexing remains on.');
+
 let connectionState = 'connecting';
 async function publishStatus() {
   try {
@@ -63,7 +68,7 @@ async function connect() {
         message?.documentWithCaptionMessage?.message?.documentMessage;
 
       const text = message?.conversation ?? message?.extendedTextMessage?.text;
-      if (process.env.INDEX_MESSAGES === '1' && typeof text === 'string' && text.trim()) {
+      if (indexMessages && typeof text === 'string' && text.trim()) {
         try {
           await mkdir('./documents', { recursive: true });
           if (!item.key?.id || !item.key?.remoteJid) continue;
