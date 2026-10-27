@@ -5,8 +5,8 @@ import makeWASocket, {
 } from 'baileys';
 import qrcode from 'qrcode-terminal';
 import { PDFParse } from 'pdf-parse';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { randomUUID, createHash } from 'node:crypto';
+import { mkdir, writeFile, access } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 
 async function connect() {
   const { state, saveCreds } = await useMultiFileAuthState('./whatsapp-auth');
@@ -63,17 +63,18 @@ async function connect() {
           console.log(type === 'append' ? 'Recent synced text message indexed.' : 'Text message indexed.');
         } catch (error) { if (error.code !== 'EEXIST') console.log('Could not index message:', error.message); }
       }
-      // Backfill currently covers text only; PDFs remain live-only.
-      if (type !== 'notify' || !document || document.mimetype !== 'application/pdf') continue;
+      if (!document || document.mimetype !== 'application/pdf') continue;
+      if (!item.key?.id || !item.key?.remoteJid) continue;
 
       let parser;
 
       try {
         console.log('\nPDF detected. Downloading...');
-        const data = await downloadMediaMessage(item, 'buffer', {});
-        const id = randomUUID();
-
+        const id = createHash('sha256').update(JSON.stringify([item.key.remoteJid, item.key.id, !!item.key.fromMe, item.key.participant || ''])).digest('hex');
         await mkdir('./documents', { recursive: true });
+        try { await access(`./documents/${id}.json`); continue; }
+        catch (error) { if (error.code !== 'ENOENT') throw error; }
+        const data = await downloadMediaMessage(item, 'buffer', {});
         await writeFile(`./documents/${id}.pdf`, data);
 
         parser = new PDFParse({ data: new Uint8Array(data) });
@@ -93,7 +94,7 @@ async function connect() {
           'utf8'
         );
 
-        console.log('PDF saved and indexed.');
+        console.log(type === 'append' ? 'Recent synced PDF saved and indexed.' : 'PDF saved and indexed.');
         if (!record.text.trim()) {
           console.log('No selectable text found; this PDF may need image recognition.');
         }
