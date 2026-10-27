@@ -1,0 +1,6 @@
+node_modules/
+whatsapp-auth/
+documents/
+downloaded-test.pdf
+.env
+.env.*
