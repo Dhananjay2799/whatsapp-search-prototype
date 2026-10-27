@@ -49,6 +49,16 @@ async function connect() {
         message?.documentMessage ??
         message?.documentWithCaptionMessage?.message?.documentMessage;
 
+      const text = message?.conversation ?? message?.extendedTextMessage?.text;
+      if (process.env.INDEX_MESSAGES === '1' && typeof text === 'string' && text.trim()) {
+        try {
+          await mkdir('./documents', { recursive: true });
+          const id = randomUUID();
+          const record = { type: 'message', filename: 'WhatsApp message', chatId: item.key.remoteJid || 'Unknown', timestamp: Number(item.messageTimestamp) || null, text };
+          await writeFile(`./documents/${id}.json`, JSON.stringify(record, null, 2), 'utf8');
+          console.log('Text message indexed.');
+        } catch (error) { console.log('Could not index message:', error.message); }
+      }
       if (!document || document.mimetype !== 'application/pdf') continue;
 
       let parser;
