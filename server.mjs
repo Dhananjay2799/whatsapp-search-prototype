@@ -5,10 +5,17 @@ import { fileURLToPath } from 'node:url';
 const root=path.dirname(fileURLToPath(import.meta.url));
 const records=path.resolve(root,'documents');
 const port=Number(process.env.PORT || 3000);
+// Optional exact HTTPS hostname for a private Tailscale Serve proxy.
+// This does not add application authentication; tailnet access rules must restrict access.
+const tailnetHost = (process.env.TAILSCALE_HOST || '').trim().toLowerCase();
+if (tailnetHost && !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ts\.net$/.test(tailnetHost)) {
+  throw new Error('TAILSCALE_HOST must be an exact Tailscale hostname ending in .ts.net');
+}
 http.createServer(async (req,res)=>{
   res.setHeader('Cache-Control','no-store');
   // Reject requests using attacker-controlled hostnames (DNS rebinding).
   const allowedHosts = new Set([`localhost:${port}`, `127.0.0.1:${port}`]);
+  if (tailnetHost) { allowedHosts.add(tailnetHost); allowedHosts.add(`${tailnetHost}:443`); }
   if (port === 80) { allowedHosts.add('localhost'); allowedHosts.add('127.0.0.1'); }
   if (!allowedHosts.has((req.headers.host || '').toLowerCase())) {
     res.writeHead(403, {'Content-Type':'text/plain'}).end('Forbidden'); return;
