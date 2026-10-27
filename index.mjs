@@ -8,6 +8,15 @@ import { PDFParse } from 'pdf-parse';
 import { mkdir, writeFile, access } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
+let connectionState = 'connecting';
+async function publishStatus() {
+  try {
+    await writeFile('./.connector-status.json', JSON.stringify({ state: connectionState, updatedAt: Date.now() }), 'utf8');
+  } catch (error) { console.error('Status update failed:', error.message); }
+}
+setInterval(publishStatus, 10000).unref();
+publishStatus();
+
 async function connect() {
   const { state, saveCreds } = await useMultiFileAuthState('./whatsapp-auth');
 
@@ -19,6 +28,7 @@ async function connect() {
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
+    if (connection) { connectionState = connection === 'open' ? 'connected' : connection === 'close' ? 'disconnected' : 'connecting'; publishStatus(); }
     if (qr) {
       console.log('\nScan the QR code using WhatsApp Linked Devices:');
       qrcode.generate(qr, { small: true });
