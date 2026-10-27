@@ -40,7 +40,7 @@ http.createServer(async (req,res)=>{
         try { const r=JSON.parse(await readFile(path.join(records,file),'utf8')); if(typeof r.text!=='string') continue;
           const displayText=r.text.normalize('NFC');
           const i=displayText.toLowerCase().indexOf(q); if(i<0) continue; const pdf=typeof r.pdfFile==='string' && /^[0-9a-f-]+\.pdf$/i.test(r.pdfFile)?r.pdfFile:null;
-          results.push({type:r.type==='message'?'Message':'PDF',filename:r.filename||'Unnamed PDF',chatId:r.chatId||'Unknown',timestamp:Number(r.timestamp)||null,excerpt:displayText.slice(Math.max(0,i-60),i+q.length+100).replace(/\s+/g,' '),pdf});
+          results.push({type:r.type==='message'?'Message':r.type==='text-file'?'Text file':'PDF',filename:r.filename||'Unnamed PDF',chatId:r.chatId||'Unknown',timestamp:Number(r.timestamp)||null,excerpt:displayText.slice(Math.max(0,i-60),i+q.length+100).replace(/\s+/g,' '),pdf});
         } catch { /* Skip incomplete or invalid index files. */ }
       }
       results.sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
