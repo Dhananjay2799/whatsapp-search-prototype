@@ -7,6 +7,14 @@ const records=path.resolve(root,'documents');
 const port=Number(process.env.PORT || 3000);
 http.createServer(async (req,res)=>{
   res.setHeader('Cache-Control','no-store');
+  // Reject requests using attacker-controlled hostnames (DNS rebinding).
+  const allowedHosts = new Set([`localhost:${port}`, `127.0.0.1:${port}`]);
+  if (port === 80) { allowedHosts.add('localhost'); allowedHosts.add('127.0.0.1'); }
+  if (!allowedHosts.has((req.headers.host || '').toLowerCase())) {
+    res.writeHead(403, {'Content-Type':'text/plain'}).end('Forbidden'); return;
+  }
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('Referrer-Policy','no-referrer');
   const url=new URL(req.url,'http://localhost');
   try {
     if(req.method!=='GET') {res.writeHead(405).end(); return;}
