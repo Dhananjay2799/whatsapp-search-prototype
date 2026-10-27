@@ -22,6 +22,7 @@ try {
         matches++;
 
         console.log(`\nMatch ${matches}`);
+        console.log('Type:', record.type || 'PDF');
         console.log('Filename:', record.filename || 'Unknown');
         console.log('Chat ID:', record.chatId || 'Unknown');
         console.log(
@@ -30,7 +31,8 @@ try {
             ? new Date(record.timestamp * 1000).toLocaleString()
             : 'Unknown'
         );
-        console.log('Saved PDF:', path.join('documents', record.pdfFile));
+        if (record.pdfFile) console.log('Saved PDF:', path.join('documents', record.pdfFile));
+        if (record.type === 'message') console.log('Message:', record.text);
       }
     } catch (error) {
       console.log(`Could not read an index file: ${file}`);
