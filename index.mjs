@@ -6,7 +6,7 @@ import makeWASocket, {
 import qrcode from 'qrcode-terminal';
 import { PDFParse } from 'pdf-parse';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 
 async function connect() {
   const { state, saveCreds } = await useMultiFileAuthState('./whatsapp-auth');
@@ -41,9 +41,12 @@ async function connect() {
   });
 
   sock.ev.on('messages.upsert', async ({ type, messages }) => {
-    if (type !== 'notify') return;
+    if (type !== 'notify' && type !== 'append') return;
 
     for (const item of messages) {
+      // Limit catch-up to recent messages; do not silently import full history.
+      const timestamp = Number(item.messageTimestamp);
+      if (type === 'append' && (!timestamp || timestamp < Date.now() / 1000 - 86400)) continue;
       const message = item.message;
       const document =
         message?.documentMessage ??
@@ -53,13 +56,15 @@ async function connect() {
       if (process.env.INDEX_MESSAGES === '1' && typeof text === 'string' && text.trim()) {
         try {
           await mkdir('./documents', { recursive: true });
-          const id = randomUUID();
+          if (!item.key?.id || !item.key?.remoteJid) continue;
+          const id = createHash('sha256').update(JSON.stringify([item.key.remoteJid, item.key.id, !!item.key.fromMe, item.key.participant || ''])).digest('hex');
           const record = { type: 'message', filename: 'WhatsApp message', chatId: item.key.remoteJid || 'Unknown', timestamp: Number(item.messageTimestamp) || null, text };
-          await writeFile(`./documents/${id}.json`, JSON.stringify(record, null, 2), 'utf8');
-          console.log('Text message indexed.');
-        } catch (error) { console.log('Could not index message:', error.message); }
+          await writeFile(`./documents/${id}.json`, JSON.stringify(record, null, 2), { encoding: 'utf8', flag: 'wx' });
+          console.log(type === 'append' ? 'Recent synced text message indexed.' : 'Text message indexed.');
+        } catch (error) { if (error.code !== 'EEXIST') console.log('Could not index message:', error.message); }
       }
-      if (!document || document.mimetype !== 'application/pdf') continue;
+      // Backfill currently covers text only; PDFs remain live-only.
+      if (type !== 'notify' || !document || document.mimetype !== 'application/pdf') continue;
 
       let parser;
 
