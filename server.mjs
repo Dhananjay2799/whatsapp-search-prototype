@@ -11,6 +11,11 @@ http.createServer(async (req,res)=>{
   try {
     if(req.method!=='GET') {res.writeHead(405).end(); return;}
     if(url.pathname==='/') {res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'}).end(await readFile(path.join(root,'phone.html')));return;}
+    if(url.pathname==='/api/status') {
+      let status={state:'offline'};
+      try { const saved=JSON.parse(await readFile(path.join(root,'.connector-status.json'),'utf8')); if(Date.now()-saved.updatedAt<25000 && ['connected','connecting','disconnected'].includes(saved.state)) status={state:saved.state}; } catch {}
+      res.writeHead(200,{'Content-Type':'application/json; charset=utf-8'}).end(JSON.stringify(status)); return;
+    }
     if(url.pathname==='/api/search') {
       const q=(url.searchParams.get('q')||'').trim().toLowerCase();
       if(!q || q.length>200){res.writeHead(400,{'Content-Type':'application/json'}).end(JSON.stringify({error:'Enter a search term of up to 200 characters.'}));return;}
