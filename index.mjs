@@ -10,6 +10,35 @@ import { fileURLToPath } from "node:url";
 process.chdir(path.dirname(fileURLToPath(import.meta.url)));
 import { mkdir, writeFile, access } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import {
+  acquireConnectorLock,
+  disconnectAction,
+} from "./lib/connector-lifecycle.mjs";
+
+let releaseLock;
+try {
+  releaseLock = await acquireConnectorLock(process.cwd());
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+let stopped = false,
+  retryTimer,
+  activeSocket;
+async function shutdown(code = 0) {
+  if (stopped) return;
+  stopped = true;
+  clearTimeout(retryTimer);
+  connectionState = "disconnected";
+  try {
+    activeSocket?.end(new Error("Connector stopped"));
+  } catch {}
+  await publishStatus();
+  await releaseLock();
+  process.exit(code);
+}
+process.once("SIGINT", () => shutdown());
+process.once("SIGTERM", () => shutdown());
 
 const indexMessages = process.env.INDEX_MESSAGES === "1";
 console.log(
@@ -34,6 +63,7 @@ setInterval(publishStatus, 10000).unref();
 publishStatus();
 
 async function connect() {
+  if (stopped) return;
   const { state, saveCreds } = await useMultiFileAuthState("./whatsapp-auth");
 
   const sock = makeWASocket({
@@ -41,9 +71,11 @@ async function connect() {
     markOnlineOnConnect: false,
   });
 
+  activeSocket = sock;
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
+    if (stopped || sock !== activeSocket) return;
     if (connection) {
       connectionState =
         connection === "open"
@@ -65,11 +97,26 @@ async function connect() {
     if (connection === "close") {
       const status = lastDisconnect?.error?.output?.statusCode;
 
-      if (status === DisconnectReason.loggedOut) {
-        console.log("Logged out. Stop the program and ask for help.");
-      } else {
+      const action = disconnectAction(status, DisconnectReason);
+      if (action === "replaced") {
+        console.error(
+          "WhatsApp connection was replaced by another connector using this linked-device session. Stop the earlier connector, then run npm.cmd run dev once. Automatic retries have been stopped.",
+        );
+        void shutdown(1);
+      } else if (action === "stop") {
+        console.error(
+          "WhatsApp authorization requires attention. Automatic retries have stopped. Check Linked Devices before reconnecting.",
+        );
+        void shutdown(1);
+      } else if (!retryTimer) {
         console.log("Connection closed; retrying in 5 seconds.");
-        setTimeout(connect, 5000);
+        retryTimer = setTimeout(() => {
+          retryTimer = null;
+          connect().catch((error) => {
+            console.error("Reconnect failed:", error.message);
+            void shutdown(1);
+          });
+        }, 5000);
       }
     }
   });
@@ -214,4 +261,5 @@ async function connect() {
 
 connect().catch((error) => {
   console.error("Could not start:", error.message);
+  void shutdown(1);
 });
