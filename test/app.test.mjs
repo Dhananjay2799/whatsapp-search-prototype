@@ -122,7 +122,9 @@ test("Gmail sync includes spam/trash, indexes attachments and encrypts credentia
     return new Response(JSON.stringify(body));
   };
   try {
-    const coverage = await mail.syncAccount("gmail-test");
+    const coverage = await mail.syncAccount("gmail-test", false, {
+      wait: async () => {},
+    });
     assert.equal(coverage.messages, 1);
     assert.equal(coverage.attachments, 1);
     assert.equal(
@@ -325,11 +327,15 @@ test("Gmail pagination reports partial coverage and resumes older mail without d
     return new Response(JSON.stringify(body));
   };
   try {
-    const first = await mail.syncAccount("paged");
+    const first = await mail.syncAccount("paged", false, {
+      wait: async () => {},
+    });
     assert.equal(first.messages, 200);
     assert.equal(first.partial, true);
     assert.equal(first.next, "8");
-    const second = await mail.syncAccount("paged", true);
+    const second = await mail.syncAccount("paged", true, {
+      wait: async () => {},
+    });
     assert.equal(second.messages, 25);
     assert.equal(second.partial, false);
     assert.equal(pageTokens.at(-1), 8);
