@@ -1,12 +1,150 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>WhatsApp Search</title><style>
-:root{font-family:system-ui,sans-serif;color:#18352d;background:#f4f8f5}*{box-sizing:border-box}body{margin:0}main{max-width:680px;margin:auto;padding:24px 18px}header{display:flex;align-items:center;gap:12px}.icon{background:#147b54;color:white;border-radius:14px;padding:12px;font-weight:bold}h1{font-size:24px;margin:0}header p{margin:3px 0;color:#61796e;font-size:14px}.hero{margin:30px 0 18px}h2{font-size:27px;margin:0 0 8px}.hero p,.hint{color:#61796e;line-height:1.45}form{display:flex;gap:8px;background:white;padding:8px;border:1px solid #dbe8e0;border-radius:16px;box-shadow:0 8px 30px #113b2510}input{min-width:0;flex:1;border:0;outline:0;font-size:16px;padding:10px}button{border:0;border-radius:10px;background:#147b54;color:white;padding:12px 18px;font-weight:700;cursor:pointer}#status{margin:22px 0;color:#61796e}.card{background:white;border:1px solid #e1ebe5;border-radius:16px;padding:18px;margin:12px 0;overflow-wrap:anywhere}.tag{font-size:12px;font-weight:700;color:#147b54;text-transform:uppercase}.card h3{font-size:17px;margin:8px 0}.meta{font-size:13px;color:#61796e}.excerpt{line-height:1.5;white-space:pre-wrap}a{color:#087b50;font-weight:600}footer{font-size:12px;color:#71877c;margin-top:32px}
-</style></head><body><main><header><div class="icon">WS</div><div><h1>WhatsApp Search</h1><p>Personal search prototype</p></div></header><p id="connection" role="status">Checking connector status…</p><section class="hero"><h2>Find what you need.</h2><p>Search the messages and files you’ve indexed on this computer.</p></section><form id="form"><input id="query" aria-label="Search messages and documents" placeholder="Search messages and documents" maxlength="200" required><button>Search</button></form><label for="filter">Show</label> <select id="filter"><option value="all">All results</option><option value="Message">Messages</option><option value="PDF">PDFs</option><option value="Text file">Text files</option></select><p class="hint">Search covers indexed content only. Scanned PDFs need text recognition.</p><div id="status" role="status">Enter a word or phrase to begin.</div><section id="results" aria-label="Search results"></section><footer>Experimental, unofficial connection. This preview runs locally on your computer.</footer></main><script>
-const form=document.querySelector('#form'), input=document.querySelector('#query'), status=document.querySelector('#status'), results=document.querySelector('#results'), filter=document.querySelector('#filter');
-let latestResults=[];
-function renderResults(){results.replaceChildren();const matches=latestResults.filter(r=>filter.value==='all'||r.type===filter.value);status.textContent=matches.length?`${matches.length} result${matches.length===1?'':'s'}`:'No matches found.';for(const r of matches){const card=el('article','','card');card.append(el('span',r.type,'tag'),el('h3',r.type==='Message'?'Message':r.filename),el('div',`${r.type==='Text file'?'Source:':'Chat:'} ${r.chatId} · ${r.timestamp?new Date(r.timestamp*1000).toLocaleString():'Date unknown'}`,'meta'),el('p',r.excerpt,'excerpt'));if(r.pdf){const a=el('a','Open PDF');a.href='/pdf/'+encodeURIComponent(r.pdf);a.target='_blank';a.rel='noopener';card.append(a)}results.append(card)}}
-filter.addEventListener('change',()=>{if(input.value.trim()) renderResults()});
-async function refreshConnection(){try{const r=await fetch('/api/status');const data=await r.json();const labels={connected:'WhatsApp connector: connected',connecting:'WhatsApp connector: connecting',disconnected:'WhatsApp connector: disconnected',offline:'WhatsApp connector: not running or status unavailable'};document.querySelector('#connection').textContent=labels[data.state]||labels.offline}catch{document.querySelector('#connection').textContent='WhatsApp connector: status unavailable'}}
-refreshConnection();setInterval(refreshConnection,10000);
-function el(tag,text,cls){const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n}
-form.addEventListener('submit',async e=>{e.preventDefault();results.replaceChildren();status.textContent='Searching…';try{const response=await fetch('/api/search?q='+encodeURIComponent(input.value.trim()));const data=await response.json();if(!response.ok)throw Error(data.error||'Search failed');latestResults=data.results;renderResults()}catch(error){status.textContent=error.message}});
-</script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#173e34" />
+    <title>Find — Personal search</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="logo">f.</div>
+        <div>
+          <h1>Find</h1>
+          <p>Your files. One search.</p>
+        </div>
+        <button id="logout" class="quiet" hidden>Lock</button>
+      </header>
+      <section id="login">
+        <h2>Your search, kept private.</h2>
+        <p>
+          Enter the access key printed in your computer’s search server window.
+        </p>
+        <form id="login-form">
+          <input
+            id="key"
+            type="password"
+            autocomplete="current-password"
+            aria-label="Access key"
+            required
+          /><button>Unlock</button>
+        </form>
+        <p id="login-status" role="status"></p>
+      </section>
+      <div id="workspace" hidden>
+        <section class="hero">
+          <span class="eyebrow">YOUR PERSONAL SEARCH</span>
+          <h2>Where did I put that?</h2>
+          <p>
+            Find a resume, an invitation, or a conversation across your
+            connected sources.
+          </p>
+        </section>
+        <form id="search-form">
+          <input
+            id="query"
+            type="search"
+            maxlength="200"
+            placeholder="Try “resume” or a word inside a document"
+            aria-label="Search your content"
+            required
+          /><button>Search</button>
+        </form>
+        <div class="filters">
+          <label
+            >Source
+            <select id="source">
+              <option value="all">All sources</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="gmail">Gmail</option>
+              <option value="outlook">Outlook</option>
+              <option value="files">Files</option>
+            </select></label
+          ><label
+            >Type
+            <select id="type">
+              <option value="all">All types</option>
+              <option>Message</option>
+              <option>Email</option>
+              <option>Attachment</option>
+              <option>PDF</option>
+              <option>DOCX</option>
+              <option>XLSX</option>
+              <option>Text file</option>
+            </select></label
+          >
+        </div>
+        <p id="search-status" role="status">
+          Search covers saved content. Connect and sync your accounts below.
+        </p>
+        <section id="results" aria-label="Search results"></section>
+        <details open>
+          <summary>Sources & connections</summary>
+          <div class="sources">
+            <article class="source">
+              <h3>
+                WhatsApp <span id="whatsapp-state" class="badge">Checking</span>
+              </h3>
+              <p>
+                Indexed chats and PDFs. Experimental linked-device connection;
+                full history is not guaranteed.
+              </p>
+            </article>
+            <article class="source">
+              <h3>Files</h3>
+              <p>
+                Import selected files or folders on your computer. Supports
+                text, PDFs, DOCX, and XLSX. Original paths appear in results.
+              </p>
+              <code>npm run import -- "C:\path\to\folder"</code>
+              <p>
+                Images and scanned documents are not yet text-searchable. File
+                changes require reimporting.
+              </p>
+            </article>
+            <article class="source">
+              <h3>Gmail <span id="gmail-config" class="badge"></span></h3>
+              <p>
+                Email and supported attachments, including available Spam and
+                Trash. Connect each account separately.
+              </p>
+              <button data-connect="gmail">Connect Gmail</button>
+            </article>
+            <article class="source">
+              <h3>Outlook <span id="outlook-config" class="badge"></span></h3>
+              <p>
+                Personal, school, and work email. Organization approval may be
+                needed.
+              </p>
+              <button data-connect="outlook">Connect Outlook</button>
+            </article>
+            <article class="source">
+              <h3>iPhone Messages <span class="badge">Unavailable</span></h3>
+              <p>
+                This app cannot automatically read your iPhone Messages history.
+                These messages are not included in results.
+              </p>
+            </article>
+            <article class="source">
+              <h3>Cloud drives <span class="badge">Not connected</span></h3>
+              <p>
+                Direct Google Drive, OneDrive, and iCloud connections are not
+                built yet. You can import files downloaded to your computer.
+              </p>
+            </article>
+          </div>
+          <div id="accounts"></div>
+          <p id="connection-status" role="status"></p>
+        </details>
+        <footer>
+          Personal prototype · Search runs on your computer. Remote access
+          requires your private Tailscale connection and this computer to remain
+          online. Indexed copies may be older than their originals.
+        </footer>
+      </div>
+    </main>
+  </body>
+</html>

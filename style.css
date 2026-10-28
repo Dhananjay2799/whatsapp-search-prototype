@@ -1,0 +1,256 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #173e34;
+  background: #f5f7f2;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+[hidden] {
+  display: none !important;
+}
+body {
+  margin: 0;
+}
+main {
+  max-width: 960px;
+  margin: auto;
+  padding: 32px 22px 56px;
+}
+header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.logo {
+  font-family: Georgia, serif;
+  font-size: 36px;
+  line-height: 1;
+  background: #173e34;
+  color: #d9ed9b;
+  width: 50px;
+  height: 50px;
+  padding: 4px 14px;
+  border-radius: 15px;
+}
+h1 {
+  font-size: 23px;
+  letter-spacing: -1px;
+  margin: 0;
+}
+header p {
+  font-size: 12px;
+  margin: 2px 0;
+  color: #6a7d73;
+}
+header button {
+  margin-left: auto;
+}
+.hero {
+  padding: 58px 0 22px;
+  max-width: 600px;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 2px;
+  font-weight: 700;
+  color: #687c61;
+}
+h2 {
+  font-family: Georgia, serif;
+  font-size: clamp(32px, 6vw, 48px);
+  font-weight: 400;
+  letter-spacing: -1.5px;
+  margin: 12px 0;
+}
+p {
+  line-height: 1.6;
+  color: #63766c;
+}
+form {
+  display: flex;
+  gap: 8px;
+  background: white;
+  padding: 8px;
+  border: 1px solid #d9e1d5;
+  border-radius: 15px;
+  box-shadow: 0 8px 28px #173e3408;
+}
+input {
+  min-width: 0;
+  flex: 1;
+  padding: 13px;
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  color: inherit;
+}
+input:focus-visible,
+button:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 3px solid #83ac46;
+  outline-offset: 3px;
+}
+button {
+  border: 0;
+  border-radius: 9px;
+  background: #173e34;
+  color: white;
+  padding: 11px 17px;
+  font-weight: 650;
+  cursor: pointer;
+  font-size: 14px;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.quiet {
+  background: #e6ecdf;
+  color: #173e34;
+}
+.filters {
+  display: flex;
+  gap: 18px;
+  margin: 18px 0;
+}
+.filters label {
+  font-size: 13px;
+  color: #68786e;
+}
+select {
+  margin-left: 5px;
+  border: 1px solid #d5dfce;
+  border-radius: 7px;
+  padding: 7px;
+  background: white;
+  color: #173e34;
+}
+#search-status {
+  font-size: 14px;
+}
+.card {
+  padding: 22px;
+  border: 1px solid #dce4d5;
+  background: white;
+  border-radius: 14px;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+.tag,
+.badge {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #466341;
+  background: #eef3e7;
+  padding: 5px 8px;
+  border-radius: 5px;
+}
+.card h3 {
+  font-size: 19px;
+  margin: 13px 0 9px;
+}
+.meta {
+  font-size: 12px;
+  color: #687b70;
+  line-height: 1.7;
+}
+.excerpt {
+  font-size: 14px;
+}
+.card a {
+  color: #1c6449;
+  font-weight: 650;
+  font-size: 13px;
+}
+details {
+  margin-top: 38px;
+  border-top: 1px solid #d6dfce;
+  padding-top: 22px;
+}
+summary {
+  font-size: 18px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.sources {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 18px;
+}
+.source {
+  padding: 18px;
+  background: #edf1e7;
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.source h3 {
+  font-size: 15px;
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.source p {
+  font-size: 12px;
+}
+.source code {
+  font-size: 11px;
+  user-select: all;
+}
+.account {
+  margin-top: 14px;
+  padding: 18px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #dce4d5;
+  overflow-wrap: anywhere;
+}
+.account button {
+  margin: 5px 6px 0 0;
+}
+.account p {
+  font-size: 13px;
+}
+footer {
+  font-size: 12px;
+  color: #78877a;
+  line-height: 1.7;
+  margin-top: 36px;
+}
+#login {
+  margin-top: 55px;
+  max-width: 600px;
+}
+#login h2 {
+  font-size: 36px;
+}
+@media (max-width: 580px) {
+  main {
+    padding: 23px 17px;
+  }
+  .hero {
+    padding-top: 38px;
+  }
+  .sources {
+    grid-template-columns: 1fr;
+  }
+  .filters {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  form button {
+    padding: 10px 13px;
+  }
+  input {
+    padding: 10px 5px;
+  }
+  .card {
+    padding: 17px;
+  }
+}

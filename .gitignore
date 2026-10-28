@@ -5,3 +5,7 @@ downloaded-test.pdf
 .env
 .env.*
 .connector-status.json
+
+.private/
+*.tmp
+!.env.example

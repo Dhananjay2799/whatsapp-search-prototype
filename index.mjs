@@ -1,127 +1,217 @@
 import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
-  downloadMediaMessage
-} from 'baileys';
-import qrcode from 'qrcode-terminal';
-import { PDFParse } from 'pdf-parse';
-import { mkdir, writeFile, access } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
+  downloadMediaMessage,
+} from "baileys";
+import qrcode from "qrcode-terminal";
+import { extract, extensions, maxBytes } from "./lib/extract.mjs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+process.chdir(path.dirname(fileURLToPath(import.meta.url)));
+import { mkdir, writeFile, access } from "node:fs/promises";
+import { createHash } from "node:crypto";
 
-const indexMessages = process.env.INDEX_MESSAGES === '1';
-console.log(indexMessages
-  ? 'Text message indexing is ON. New message text will be saved in the documents folder.'
-  : 'Text message indexing is OFF. Set INDEX_MESSAGES=1 before starting to enable it. PDF indexing remains on.');
+const indexMessages = process.env.INDEX_MESSAGES === "1";
+console.log(
+  indexMessages
+    ? "Text message indexing is ON. New message text will be saved in the documents folder."
+    : "Text message indexing is OFF. Set INDEX_MESSAGES=1 before starting to enable it. PDF indexing remains on.",
+);
 
-let connectionState = 'connecting';
+let connectionState = "connecting";
 async function publishStatus() {
   try {
-    await writeFile('./.connector-status.json', JSON.stringify({ state: connectionState, updatedAt: Date.now() }), 'utf8');
-  } catch (error) { console.error('Status update failed:', error.message); }
+    await writeFile(
+      "./.connector-status.json",
+      JSON.stringify({ state: connectionState, updatedAt: Date.now() }),
+      "utf8",
+    );
+  } catch (error) {
+    console.error("Status update failed:", error.message);
+  }
 }
 setInterval(publishStatus, 10000).unref();
 publishStatus();
 
 async function connect() {
-  const { state, saveCreds } = await useMultiFileAuthState('./whatsapp-auth');
+  const { state, saveCreds } = await useMultiFileAuthState("./whatsapp-auth");
 
   const sock = makeWASocket({
     auth: state,
-    markOnlineOnConnect: false
+    markOnlineOnConnect: false,
   });
 
-  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
-    if (connection) { connectionState = connection === 'open' ? 'connected' : connection === 'close' ? 'disconnected' : 'connecting'; publishStatus(); }
+  sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
+    if (connection) {
+      connectionState =
+        connection === "open"
+          ? "connected"
+          : connection === "close"
+            ? "disconnected"
+            : "connecting";
+      publishStatus();
+    }
     if (qr) {
-      console.log('\nScan the QR code using WhatsApp Linked Devices:');
+      console.log("\nScan the QR code using WhatsApp Linked Devices:");
       qrcode.generate(qr, { small: true });
     }
 
-    if (connection === 'open') {
-      console.log('\nWhatsApp connected successfully.');
+    if (connection === "open") {
+      console.log("\nWhatsApp connected successfully.");
     }
 
-    if (connection === 'close') {
+    if (connection === "close") {
       const status = lastDisconnect?.error?.output?.statusCode;
 
       if (status === DisconnectReason.loggedOut) {
-        console.log('Logged out. Stop the program and ask for help.');
+        console.log("Logged out. Stop the program and ask for help.");
       } else {
-        console.log('Connection closed; retrying in 5 seconds.');
+        console.log("Connection closed; retrying in 5 seconds.");
         setTimeout(connect, 5000);
       }
     }
   });
 
-  sock.ev.on('messages.upsert', async ({ type, messages }) => {
-    if (type !== 'notify' && type !== 'append') return;
+  sock.ev.on("messages.upsert", async ({ type, messages }) => {
+    if (type !== "notify" && type !== "append") return;
 
     for (const item of messages) {
       // Limit catch-up to recent messages; do not silently import full history.
       const timestamp = Number(item.messageTimestamp);
-      if (type === 'append' && (!timestamp || timestamp < Date.now() / 1000 - 86400)) continue;
+      if (
+        type === "append" &&
+        (!timestamp || timestamp < Date.now() / 1000 - 86400)
+      )
+        continue;
       const message = item.message;
       const document =
         message?.documentMessage ??
         message?.documentWithCaptionMessage?.message?.documentMessage;
 
       const text = message?.conversation ?? message?.extendedTextMessage?.text;
-      if (indexMessages && typeof text === 'string' && text.trim()) {
+      if (indexMessages && typeof text === "string" && text.trim()) {
         try {
-          await mkdir('./documents', { recursive: true });
+          await mkdir("./documents", { recursive: true });
           if (!item.key?.id || !item.key?.remoteJid) continue;
-          const id = createHash('sha256').update(JSON.stringify([item.key.remoteJid, item.key.id, !!item.key.fromMe, item.key.participant || ''])).digest('hex');
-          const record = { type: 'message', filename: 'WhatsApp message', chatId: item.key.remoteJid || 'Unknown', timestamp: Number(item.messageTimestamp) || null, text };
-          await writeFile(`./documents/${id}.json`, JSON.stringify(record, null, 2), { encoding: 'utf8', flag: 'wx' });
-          console.log(type === 'append' ? 'Recent synced text message indexed.' : 'Text message indexed.');
-        } catch (error) { if (error.code !== 'EEXIST') console.log('Could not index message:', error.message); }
+          const id = createHash("sha256")
+            .update(
+              JSON.stringify([
+                item.key.remoteJid,
+                item.key.id,
+                !!item.key.fromMe,
+                item.key.participant || "",
+              ]),
+            )
+            .digest("hex");
+          const record = {
+            type: "message",
+            filename: "WhatsApp message",
+            chatId: item.key.remoteJid || "Unknown",
+            timestamp: Number(item.messageTimestamp) || null,
+            text,
+          };
+          await writeFile(
+            `./documents/${id}.json`,
+            JSON.stringify(record, null, 2),
+            { encoding: "utf8", flag: "wx" },
+          );
+          console.log(
+            type === "append"
+              ? "Recent synced text message indexed."
+              : "Text message indexed.",
+          );
+        } catch (error) {
+          if (error.code !== "EEXIST")
+            console.log("Could not index message:", error.message);
+        }
       }
-      if (!document || document.mimetype !== 'application/pdf') continue;
+      if (!document) continue;
       if (!item.key?.id || !item.key?.remoteJid) continue;
 
-      let parser;
-
       try {
-        console.log('\nPDF detected. Downloading...');
-        const id = createHash('sha256').update(JSON.stringify([item.key.remoteJid, item.key.id, !!item.key.fromMe, item.key.participant || ''])).digest('hex');
-        await mkdir('./documents', { recursive: true });
-        try { await access(`./documents/${id}.json`); continue; }
-        catch (error) { if (error.code !== 'ENOENT') throw error; }
-        const data = await downloadMediaMessage(item, 'buffer', {});
-        await writeFile(`./documents/${id}.pdf`, data);
-
-        parser = new PDFParse({ data: new Uint8Array(data) });
-        const result = await parser.getText();
+        console.log("\nDocument detected. Indexing...");
+        const id = createHash("sha256")
+          .update(
+            JSON.stringify([
+              item.key.remoteJid,
+              item.key.id,
+              !!item.key.fromMe,
+              item.key.participant || "",
+            ]),
+          )
+          .digest("hex");
+        await mkdir("./documents", { recursive: true });
+        try {
+          await access(`./documents/${id}.json`);
+          continue;
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error;
+        }
+        const filename = document.fileName || "Unnamed document";
+        const ext = path.extname(filename).toLowerCase();
+        let text = "",
+          pdfFile = null,
+          contentStatus =
+            "Content extraction is not supported for this document";
+        if (
+          extensions.has(ext) &&
+          Number(document.fileLength || 0) <= maxBytes
+        ) {
+          const data = await downloadMediaMessage(item, "buffer", {});
+          if (data.length <= maxBytes) {
+            try {
+              text = await extract(data, filename);
+              contentStatus = text.trim()
+                ? "extracted"
+                : "No text extracted; OCR may be required";
+            } catch {
+              contentStatus = "Text extraction failed; search the filename";
+            }
+            if (ext === ".pdf") {
+              pdfFile = `${id}.pdf`;
+              await writeFile(`./documents/${pdfFile}`, data);
+            }
+          } else
+            contentStatus =
+              "Document exceeds the 20 MB content extraction limit";
+        }
 
         const record = {
-          filename: document.fileName || 'Unnamed PDF',
-          chatId: item.key.remoteJid || 'Unknown',
+          type: "attachment",
+          source: "whatsapp",
+          filename,
+          contentStatus,
+          chatId: item.key.remoteJid || "Unknown",
           timestamp: Number(item.messageTimestamp) || null,
-          pdfFile: `${id}.pdf`,
-          text: result.text || ''
+          pdfFile,
+          text,
         };
 
         await writeFile(
           `./documents/${id}.json`,
           JSON.stringify(record, null, 2),
-          'utf8'
+          "utf8",
         );
 
-        console.log(type === 'append' ? 'Recent synced PDF saved and indexed.' : 'PDF saved and indexed.');
+        console.log(
+          type === "append"
+            ? "Recent synced document indexed."
+            : "Document indexed.",
+        );
         if (!record.text.trim()) {
-          console.log('No selectable text found; this PDF may need image recognition.');
+          console.log(
+            "No selectable text found; this PDF may need image recognition.",
+          );
         }
       } catch (error) {
-        console.log('Could not process PDF:', error.message);
-      } finally {
-        if (parser) await parser.destroy();
+        console.log("Could not process PDF:", error.message);
       }
     }
   });
 }
 
-connect().catch(error => {
-  console.error('Could not start:', error.message);
+connect().catch((error) => {
+  console.error("Could not start:", error.message);
 });

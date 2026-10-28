@@ -1,10 +1,14 @@
 {
   "name": "whatsapp-search-prototype",
   "version": "1.0.0",
-  "description": "",
+  "description": "Personal unified search for connected email, WhatsApp and selected files",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "connector": "node --env-file-if-exists=.env --import ./lib/connector-defaults.mjs index.mjs",
+    "import": "node import-files.mjs",
+    "test": "node --test",
+    "dev": "node --env-file-if-exists=.env start.mjs"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +17,8 @@
   "dependencies": {
     "baileys": "^7.0.0-rc14",
     "pdf-parse": "^2.4.5",
-    "qrcode-terminal": "^0.12.0"
+    "qrcode-terminal": "^0.12.0",
+    "mammoth": "^1.11.0",
+    "exceljs": "^4.4.0"
   }
 }
