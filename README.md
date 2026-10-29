@@ -38,9 +38,34 @@ npm.cmd run import -- "C:\Users\dhana\OneDrive\Desktop\Documents"
 npm.cmd run import -- "C:\path\resume.pdf" "C:\path\resume.docx"
 ```
 
-Supports UTF-8 TXT/MD/CSV/JSON/LOG, text PDFs, DOCX, XLSX (20 MB per file). Recurses into explicitly selected folders; skips symlinks, application secrets, and index directories. Search matches names, original paths, and extracted text. Results show the full source path. Local files are not downloaded through the phone interface. Reimport to refresh changed files; deleting an original does not automatically remove its indexed copy. Existing `import-text.mjs` still works.
+Supports UTF-8 TXT/MD/CSV/JSON/LOG, PDFs (including scanned ones), DOCX, XLSX and photos (JPG, PNG, WebP, BMP), 20 MB per file. Recurses into explicitly selected folders; skips symlinks, application secrets, and index directories. Search matches names, original paths, and extracted text. Results show the full source path. Local files are not downloaded through the phone interface. Reimport to refresh changed files; deleting an original does not automatically remove its indexed copy. Existing `import-text.mjs` still works.
 
-New WhatsApp documents of these supported types are extracted too. Other document attachment names remain searchable with a content-unavailable label. Existing indexed PDFs continue to open through authenticated routes. No complete WhatsApp history or catch-up guarantee; the existing 24-hour catch-up bound remains. Message edits/deletes and disappearing-message lifecycle are not reconciled. Images, scanned PDF OCR, voice notes and semantic search are not implemented.
+New WhatsApp documents and photos of these supported types are extracted too. Other document attachment names remain searchable with a content-unavailable label. Saved PDFs and photos open through authenticated routes. Message edits/deletes and disappearing-message lifecycle are not reconciled. Voice notes, videos and semantic search are not implemented.
+
+## Photos and scanned PDFs (OCR)
+
+Text in photos and scanned PDFs is read with OCR (tesseract.js), for WhatsApp, email attachments and imported files. A photo of a receipt becomes searchable by what is written on it, and the **Image** type filter shows photos. Scanned PDFs are read up to the first 5 pages (`OCR_MAX_PDF_PAGES` to change).
+
+- The first OCR run downloads language data (a few MB) into `.ocr-cache/`, so it needs internet once.
+- English only by default. For other scripts set `OCR_LANGS` in `.env`, e.g. `OCR_LANGS=eng+guj+hin` for English, Gujarati and Hindi.
+- OCR takes a second or more per photo; large history imports take a while.
+- iPhone HEIC photos are not supported (WhatsApp converts photos to JPEG, so WhatsApp photos are fine).
+- Handwriting and low-quality photos may be read poorly.
+
+## Full WhatsApp history (optional)
+
+By default only the last 24 hours are caught up when the connector starts. To import older chats, files and photos:
+
+1. Set `WHATSAPP_FULL_HISTORY=1` in `.env`.
+2. Stop the connector, then on your phone open WhatsApp > Linked Devices and log out of this device.
+3. Delete the `whatsapp-auth` folder. WhatsApp sends history only when a device is first linked.
+4. Run `npm.cmd run dev` and scan the new QR code. Keep it running; history arrives in batches and the console shows progress.
+
+Already indexed items are not duplicated. Notes:
+
+- WhatsApp decides how much history it sends; there is no guarantee of every message.
+- Older media may have expired on WhatsApp's servers. The connector asks your phone to re-upload it, which needs the phone online and still holding the file. Documents that cannot be downloaded remain searchable by filename.
+- With text indexing on, a large history creates many index files and makes each search slower. A database-backed index would be the next step if that becomes noticeable.
 
 ## Connect Gmail
 
@@ -75,9 +100,9 @@ Tokens are encrypted with AES-256-GCM and a local key. The key and encrypted tok
 
 - iPhone Messages history: unavailable; no automatic integration has been implemented.
 - Direct Google Drive, OneDrive and iCloud: not connected. Downloaded copies can be imported.
-- OCR, semantic matching, mobile-native apps, hosted always-on operation: pending.
+- Semantic matching, voice notes, video, mobile-native apps, hosted always-on operation: pending.
 - WhatsApp remains an unofficial linked-device integration.
 
 ## Validation
 
-`npm test` checks legacy WhatsApp compatibility, filename/path/Unicode/Gujarati search, DOCX/XLSX extraction, encrypted credential storage, mocked Gmail/Outlook attachment sync and disconnect, and actual HTTP authentication/CSRF/host restrictions. It does not prove real Google/Microsoft sign-in, account policy approval, full mailbox coverage or phone connectivity. Test real sign-in and one non-sensitive attachment per account before relying on those connectors.
+`npm test` checks OCR of photos and scanned PDFs, WhatsApp photo/document indexing (including disappearing messages, captions, expired media, the 24-hour limit and full-history mode, and no duplicates of existing records), authenticated photo serving, legacy WhatsApp compatibility, filename/path/Unicode/Gujarati search, DOCX/XLSX extraction, encrypted credential storage, mocked Gmail/Outlook attachment sync and disconnect, and actual HTTP authentication/CSRF/host restrictions. It does not prove real Google/Microsoft sign-in, account policy approval, full mailbox coverage or phone connectivity. Test real sign-in and one non-sensitive attachment per account before relying on those connectors.

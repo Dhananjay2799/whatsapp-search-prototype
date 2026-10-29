@@ -77,9 +77,20 @@ function render() {
     );
     if (r.contentStatus && r.contentStatus !== "extracted")
       c.append(el("p", r.contentStatus, "meta"));
-    const href = r.pdf ? "/pdf/" + encodeURIComponent(r.pdf) : r.openUrl;
+    const href = r.pdf
+      ? "/pdf/" + encodeURIComponent(r.pdf)
+      : r.image
+        ? "/image/" + encodeURIComponent(r.image)
+        : r.openUrl;
     if (href) {
-      const a = el("a", r.pdf ? "Open saved PDF" : "Open original email");
+      const a = el(
+        "a",
+        r.pdf
+          ? "Open saved PDF"
+          : r.image
+            ? "Open saved photo"
+            : "Open original email",
+      );
       a.href = href;
       a.target = "_blank";
       a.rel = "noopener noreferrer";

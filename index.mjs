@@ -2,14 +2,14 @@ import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
   downloadMediaMessage,
+  Browsers,
 } from "baileys";
 import qrcode from "qrcode-terminal";
-import { extract, extensions, maxBytes } from "./lib/extract.mjs";
+import { indexWhatsAppMessage } from "./lib/whatsapp.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 process.chdir(path.dirname(fileURLToPath(import.meta.url)));
-import { mkdir, writeFile, access } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import { writeFile } from "node:fs/promises";
 import {
   acquireConnectorLock,
   disconnectAction,
@@ -44,8 +44,45 @@ const indexMessages = process.env.INDEX_MESSAGES === "1";
 console.log(
   indexMessages
     ? "Text message indexing is ON. New message text will be saved in the documents folder."
-    : "Text message indexing is OFF. Set INDEX_MESSAGES=1 before starting to enable it. PDF indexing remains on.",
+    : "Text message indexing is OFF. Set INDEX_MESSAGES=1 before starting to enable it. Document and photo indexing remains on.",
 );
+const fullHistory = process.env.WHATSAPP_FULL_HISTORY === "1";
+console.log(
+  fullHistory
+    ? "Full WhatsApp history is ON. WhatsApp sends it only when this device is first linked: to import it, unlink this device on your phone, delete the whatsapp-auth folder and scan a new QR code."
+    : "Full WhatsApp history is OFF; only the last 24 hours are caught up. Set WHATSAPP_FULL_HISTORY=1 to import older chats.",
+);
+
+// Handle one message at a time, so a large history sync doesn't overload the computer.
+let queue = Promise.resolve();
+function enqueue(item, { recentOnly, live }) {
+  queue = queue
+    .then(() =>
+      indexWhatsAppMessage(item, {
+        download: (media) =>
+          downloadMediaMessage(
+            media,
+            "buffer",
+            {},
+            // Lets WhatsApp ask your phone to re-upload media that has expired.
+            {
+              logger: activeSocket.logger,
+              reuploadRequest: activeSocket.updateMediaMessage,
+            },
+          ),
+        indexMessages,
+        recentOnly,
+      }),
+    )
+    .then((kind) => {
+      if (kind === "document" || kind === "image")
+        console.log(live ? `New ${kind} indexed.` : `Older ${kind} indexed.`);
+      else if (kind === "message" && live) console.log("Text message indexed.");
+    })
+    .catch((error) => {
+      console.log("Could not index a WhatsApp item:", error.message);
+    });
+}
 
 let connectionState = "connecting";
 async function publishStatus() {
@@ -69,6 +106,13 @@ async function connect() {
   const sock = makeWASocket({
     auth: state,
     markOnlineOnConnect: false,
+    // Full history needs a desktop identity, and Baileys drops the full-history
+    // batch unless it is accepted explicitly.
+    ...(fullHistory && {
+      browser: Browsers.macOS("Desktop"),
+      syncFullHistory: true,
+      shouldSyncHistoryMessage: () => true,
+    }),
   });
 
   activeSocket = sock;
@@ -121,142 +165,25 @@ async function connect() {
     }
   });
 
-  sock.ev.on("messages.upsert", async ({ type, messages }) => {
+  sock.ev.on("messages.upsert", ({ type, messages }) => {
     if (type !== "notify" && type !== "append") return;
-
-    for (const item of messages) {
-      // Limit catch-up to recent messages; do not silently import full history.
-      const timestamp = Number(item.messageTimestamp);
-      if (
-        type === "append" &&
-        (!timestamp || timestamp < Date.now() / 1000 - 86400)
-      )
-        continue;
-      const message = item.message;
-      const document =
-        message?.documentMessage ??
-        message?.documentWithCaptionMessage?.message?.documentMessage;
-
-      const text = message?.conversation ?? message?.extendedTextMessage?.text;
-      if (indexMessages && typeof text === "string" && text.trim()) {
-        try {
-          await mkdir("./documents", { recursive: true });
-          if (!item.key?.id || !item.key?.remoteJid) continue;
-          const id = createHash("sha256")
-            .update(
-              JSON.stringify([
-                item.key.remoteJid,
-                item.key.id,
-                !!item.key.fromMe,
-                item.key.participant || "",
-              ]),
-            )
-            .digest("hex");
-          const record = {
-            type: "message",
-            filename: "WhatsApp message",
-            chatId: item.key.remoteJid || "Unknown",
-            timestamp: Number(item.messageTimestamp) || null,
-            text,
-          };
-          await writeFile(
-            `./documents/${id}.json`,
-            JSON.stringify(record, null, 2),
-            { encoding: "utf8", flag: "wx" },
-          );
-          console.log(
-            type === "append"
-              ? "Recent synced text message indexed."
-              : "Text message indexed.",
-          );
-        } catch (error) {
-          if (error.code !== "EEXIST")
-            console.log("Could not index message:", error.message);
-        }
-      }
-      if (!document) continue;
-      if (!item.key?.id || !item.key?.remoteJid) continue;
-
-      try {
-        console.log("\nDocument detected. Indexing...");
-        const id = createHash("sha256")
-          .update(
-            JSON.stringify([
-              item.key.remoteJid,
-              item.key.id,
-              !!item.key.fromMe,
-              item.key.participant || "",
-            ]),
-          )
-          .digest("hex");
-        await mkdir("./documents", { recursive: true });
-        try {
-          await access(`./documents/${id}.json`);
-          continue;
-        } catch (error) {
-          if (error.code !== "ENOENT") throw error;
-        }
-        const filename = document.fileName || "Unnamed document";
-        const ext = path.extname(filename).toLowerCase();
-        let text = "",
-          pdfFile = null,
-          contentStatus =
-            "Content extraction is not supported for this document";
-        if (
-          extensions.has(ext) &&
-          Number(document.fileLength || 0) <= maxBytes
-        ) {
-          const data = await downloadMediaMessage(item, "buffer", {});
-          if (data.length <= maxBytes) {
-            try {
-              text = await extract(data, filename);
-              contentStatus = text.trim()
-                ? "extracted"
-                : "No text extracted; OCR may be required";
-            } catch {
-              contentStatus = "Text extraction failed; search the filename";
-            }
-            if (ext === ".pdf") {
-              pdfFile = `${id}.pdf`;
-              await writeFile(`./documents/${pdfFile}`, data);
-            }
-          } else
-            contentStatus =
-              "Document exceeds the 20 MB content extraction limit";
-        }
-
-        const record = {
-          type: "attachment",
-          source: "whatsapp",
-          filename,
-          contentStatus,
-          chatId: item.key.remoteJid || "Unknown",
-          timestamp: Number(item.messageTimestamp) || null,
-          pdfFile,
-          text,
-        };
-
-        await writeFile(
-          `./documents/${id}.json`,
-          JSON.stringify(record, null, 2),
-          "utf8",
-        );
-
-        console.log(
-          type === "append"
-            ? "Recent synced document indexed."
-            : "Document indexed.",
-        );
-        if (!record.text.trim()) {
-          console.log(
-            "No selectable text found; this PDF may need image recognition.",
-          );
-        }
-      } catch (error) {
-        console.log("Could not process PDF:", error.message);
-      }
-    }
+    for (const item of messages)
+      enqueue(item, {
+        // Without full history, limit catch-up to recent messages.
+        recentOnly: type === "append" && !fullHistory,
+        live: type === "notify",
+      });
   });
+
+  if (fullHistory)
+    sock.ev.on("messaging-history.set", ({ messages, progress }) => {
+      console.log(
+        `History batch received: ${messages.length} messages` +
+          (typeof progress === "number" ? ` (${progress}% of history synced)` : ""),
+      );
+      for (const item of messages)
+        enqueue(item, { recentOnly: false, live: false });
+    });
 }
 
 connect().catch((error) => {

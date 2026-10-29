@@ -1,6 +1,6 @@
 import { readdir, readFile, lstat, realpath } from "node:fs/promises";
 import path from "node:path";
-import { extract, extensions, maxBytes } from "./lib/extract.mjs";
+import { extract, extensions, maxBytes, closeOcr } from "./lib/extract.mjs";
 import { putRecord } from "./lib/store.mjs";
 const args = process.argv.slice(2),
   seen = new Set();
@@ -51,7 +51,7 @@ async function visit(file) {
     text,
     contentStatus: text.trim()
       ? "extracted"
-      : "No text extracted; OCR may be required",
+      : "No readable text found; search the filename",
   });
   indexed++;
   console.log("Indexed:", absolute);
@@ -65,6 +65,7 @@ if (!args.length) {
       failed++;
       console.error("Import failed:", e.message);
     });
+  await closeOcr();
   console.log(JSON.stringify({ indexed, skipped, failed }));
   if (failed) process.exitCode = 1;
 }
