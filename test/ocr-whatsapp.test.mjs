@@ -11,7 +11,7 @@ process.env.SEARCH_DATA_DIR = temp;
 const store = await import("../lib/store.mjs");
 const { search } = await import("../lib/search.mjs");
 const { extract, closeOcr } = await import("../lib/extract.mjs");
-const { indexWhatsAppMessage, recordId } = await import(
+const { indexWhatsAppMessage, recordId, historySocketOptions } = await import(
   "../lib/whatsapp.mjs"
 );
 // OCR downloads its English language data once on first use (needs internet).
@@ -36,6 +36,15 @@ test("photos and scanned PDFs are read with OCR", async () => {
     await extract(await fixture("scanned-invitation.pdf"), "scan.pdf"),
     /INVITATION/,
   );
+});
+
+test("full history keeps the default browser identity, which WhatsApp accepts", () => {
+  assert.deepEqual(historySocketOptions(false), {});
+  const options = historySocketOptions(true);
+  assert.equal(options.syncFullHistory, true);
+  assert.equal(options.shouldSyncHistoryMessage({ syncType: 0 }), true);
+  // WhatsApp terminates logins that claim the "Desktop" identity.
+  assert.equal("browser" in options, false);
 });
 
 test("record IDs match the original connector, so existing items are not duplicated", () => {

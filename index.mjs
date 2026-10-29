@@ -2,10 +2,12 @@ import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
   downloadMediaMessage,
-  Browsers,
 } from "baileys";
 import qrcode from "qrcode-terminal";
-import { indexWhatsAppMessage } from "./lib/whatsapp.mjs";
+import {
+  indexWhatsAppMessage,
+  historySocketOptions,
+} from "./lib/whatsapp.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 process.chdir(path.dirname(fileURLToPath(import.meta.url)));
@@ -106,13 +108,7 @@ async function connect() {
   const sock = makeWASocket({
     auth: state,
     markOnlineOnConnect: false,
-    // Full history needs a desktop identity, and Baileys drops the full-history
-    // batch unless it is accepted explicitly.
-    ...(fullHistory && {
-      browser: Browsers.macOS("Desktop"),
-      syncFullHistory: true,
-      shouldSyncHistoryMessage: () => true,
-    }),
+    ...historySocketOptions(fullHistory),
   });
 
   activeSocket = sock;
