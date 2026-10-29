@@ -1,10 +1,11 @@
 {
   "name": "whatsapp-search-prototype",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Automatically indexes WhatsApp PDFs, photos and documents (including chat history) and lets you search them by filename, caption or text.",
+  "main": "index.mjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.mjs",
+    "search": "node search-all.mjs"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +14,7 @@
   "dependencies": {
     "baileys": "^7.0.0-rc14",
     "pdf-parse": "^2.4.5",
-    "qrcode-terminal": "^0.12.0"
+    "qrcode-terminal": "^0.12.0",
+    "tesseract.js": "^7.0.0"
   }
 }
