@@ -65,7 +65,7 @@ test("file extraction reads DOCX and XLSX text without HTML execution", async ()
     /Resume engineer/,
   );
   await assert.rejects(
-    extract(Buffer.from("image"), "photo.jpg"),
+    extract(Buffer.from("video"), "clip.mp4"),
     /Unsupported/,
   );
 });

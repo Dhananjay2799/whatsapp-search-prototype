@@ -74,6 +74,7 @@
               <option>DOCX</option>
               <option>XLSX</option>
               <option>Text file</option>
+              <option>Image</option>
             </select></label
           >
         </div>
@@ -89,20 +90,21 @@
                 WhatsApp <span id="whatsapp-state" class="badge">Checking</span>
               </h3>
               <p>
-                Indexed chats and PDFs. Experimental linked-device connection;
-                full history is not guaranteed.
+                Indexed chats, documents and photos. Experimental linked-device
+                connection; full history is optional and not guaranteed.
               </p>
             </article>
             <article class="source">
               <h3>Files</h3>
               <p>
                 Import selected files or folders on your computer. Supports
-                text, PDFs, DOCX, and XLSX. Original paths appear in results.
+                text, PDFs, DOCX, XLSX and photos (JPG, PNG, WebP). Original
+                paths appear in results.
               </p>
               <code>npm run import -- "C:\path\to\folder"</code>
               <p>
-                Images and scanned documents are not yet text-searchable. File
-                changes require reimporting.
+                Text in photos and scanned PDFs is read with OCR. File changes
+                require reimporting.
               </p>
             </article>
             <article class="source">

@@ -9,3 +9,5 @@ downloaded-test.pdf
 .private/
 *.tmp
 !.env.example
+.ocr-cache/
+*.traineddata

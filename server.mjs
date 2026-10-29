@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { randomBytes, timingSafeEqual, createHash } from "node:crypto";
 import { root, documents, privateDir, readJSON, atomic } from "./lib/store.mjs";
-import { search } from "./lib/search.mjs";
+import { search, savedImage } from "./lib/search.mjs";
 import {
   configured,
   beginConnect,
@@ -165,7 +165,7 @@ const server = http.createServer(async (req, res) => {
           messages:
             "iPhone Messages is not connected. Automatic full-history access is unavailable in this app.",
           files:
-            "Only explicitly imported files and folders are searchable. Images and scanned documents need OCR.",
+            "Only explicitly imported files and folders are searchable. Text in photos and scanned PDFs is read with OCR.",
         },
       });
     }
@@ -235,6 +235,34 @@ const server = http.createServer(async (req, res) => {
           })
           .end(data);
       } catch (e) {
+        if (!res.headersSent) res.writeHead(404);
+        res.end();
+      }
+      return;
+    }
+    if (req.method === "GET" && url.pathname.startsWith("/image/")) {
+      const name = url.pathname.slice(7);
+      if (!savedImage.test(name)) {
+        res.writeHead(404).end();
+        return;
+      }
+      const ext = path.extname(name).toLowerCase();
+      try {
+        const data = await readFile(path.join(documents, name));
+        res
+          .writeHead(200, {
+            "Content-Type":
+              ext === ".png"
+                ? "image/png"
+                : ext === ".webp"
+                  ? "image/webp"
+                  : ext === ".bmp"
+                    ? "image/bmp"
+                    : "image/jpeg",
+            "Content-Disposition": "inline",
+          })
+          .end(data);
+      } catch {
         if (!res.headersSent) res.writeHead(404);
         res.end();
       }
